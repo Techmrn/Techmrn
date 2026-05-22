@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Scoring - Match {{ match.id }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+    <style>
+        .scoring-panel { display: flex; gap: 20px; }
+        .score-form { flex: 1; border: 1px solid #ccc; padding: 15px; }
+        .live-feed { flex: 1; border: 1px solid #ccc; padding: 15px; background: #fafafa; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Live Scoring: {{ match.team1.name }} vs {{ match.team2.name }}</h1>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/fixtures">Back to Fixtures</a>
+        </nav>
+    </header>
+    <main>
+        <div class="scoring-panel">
+            <div class="score-form">
+                <h3>Log Next Ball</h3>
+                <form id="ballForm" onsubmit="submitBall(event)">
+                    <div>
+                        <label>Inning:</label>
+                        <select name="inning" required>
+                            <option value="1">1st Inning</option>
+                            <option value="2">2nd Inning</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Over:</label>
+                        <input type="number" name="over" required min="0">
+                    </div>
+                    <div>
+                        <label>Ball:</label>
+                        <input type="number" name="ball" required min="1" max="6">
+                    </div>
+                    <div>
+                        <label>Bowler:</label>
+                        <select name="bowler_id" required>
+                            <optgroup label="{{ match.team1.name }}">
+                                {% for p in team1_players %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+                            </optgroup>
+                            <optgroup label="{{ match.team2.name }}">
+                                {% for p in team2_players %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Striker:</label>
+                        <select name="striker_id" required>
+                            <optgroup label="{{ match.team1.name }}">
+                                {% for p in team1_players %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+                            </optgroup>
+                            <optgroup label="{{ match.team2.name }}">
+                                {% for p in team2_players %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Non-Striker:</label>
+                        <select name="non_striker_id" required>
+                            <optgroup label="{{ match.team1.name }}">
+                                {% for p in team1_players %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+                            </optgroup>
+                            <optgroup label="{{ match.team2.name }}">
+                                {% for p in team2_players %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Runs (Bat):</label>
+                        <input type="number" name="runs" value="0" min="0">
+                    </div>
+                    <div>
+                        <label>Extras:</label>
+                        <input type="checkbox" name="is_wide" value="true"> Wide
+                        <input type="checkbox" name="is_no_ball" value="true"> No Ball
+                        <input type="checkbox" name="is_bye" value="true"> Bye
+                        <input type="checkbox" name="is_leg_bye" value="true"> Leg Bye
+                    </div>
+                    <div>
+                        <label>Wicket:</label>
+                        <input type="checkbox" name="is_wicket" value="true">
+                        <select name="wicket_type">
+                            <option value="">-- Type --</option>
+                            <option value="bowled">Bowled</option>
+                            <option value="caught">Caught</option>
+                            <option value="runout">Run Out</option>
+                            <option value="lbw">LBW</option>
+                        </select>
+                    </div>
+                    <button type="submit">Log Ball</button>
+                </form>
+            </div>
+            <div class="live-feed">
+                <h3>Live Feed</h3>
+                <ul id="feed_log"></ul>
+
+                <hr style="margin-top: 30px;">
+                <h3>Complete Match</h3>
+                <form id="completeForm" onsubmit="submitComplete(event)">
+                    <div>
+                        <label>Select Winner:</label>
+                        <select name="winner_id" required>
+                            <option value="{{ match.team1.id }}">{{ match.team1.name }}</option>
+                            <option value="{{ match.team2.id }}">{{ match.team2.name }}</option>
+                        </select>
+                    </div>
+                    <button type="submit" style="background-color: #4CAF50; color: white; margin-top: 10px;">End Match</button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const matchId = {{ match.id }};
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const ws = new WebSocket(`${protocol}//${window.location.host}/scoring/ws/${matchId}`);
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.action === "ball_logged") {
+                const log = document.getElementById("feed_log");
+                const li = document.createElement("li");
+                let msg = `Over ${data.details.over}.${data.details.ball}: ${data.details.runs} runs`;
+                if (data.details.extras) msg += ` (${data.details.extras})`;
+                if (data.details.wicket) msg += ` - WICKET!`;
+                li.innerText = msg;
+                log.prepend(li);
+            }
+        };
+
+        async function submitBall(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+
+            const response = await fetch(`/scoring/${matchId}/ball`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                // Auto-increment ball count
+                let ballInput = form.querySelector('input[name="ball"]');
+                let overInput = form.querySelector('input[name="over"]');
+                let ball = parseInt(ballInput.value);
+                let over = parseInt(overInput.value);
+
+                // Keep checkboxes simple for now, resetting them manually might be needed depending on UI flow
+                form.reset();
+
+                if (ball === 6) {
+                    ballInput.value = 1;
+                    overInput.value = over + 1;
+                } else {
+                    ballInput.value = ball + 1;
+                    overInput.value = over;
+                }
+            } else {
+                alert("Failed to log ball.");
+            }
+        }
+
+        async function submitComplete(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+
+            const response = await fetch(`/scoring/${matchId}/complete`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                alert("Match completed and winner updated!");
+                window.location.href = "/fixtures";
+            } else {
+                alert("Failed to complete match.");
+            }
+        }
+    </script>
+</body>
+</html>
