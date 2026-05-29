@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Player - Cricket Tournament</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Register Player</h1>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/players/register">Register Player</a>
+            <a href="/teams/register">Register Team</a>
+            <a href="/auction">Live Auction</a>
+        </nav>
+    </header>
+    <main>
+        {% if error %}
+            <p style="color: red;">{{ error }}</p>
+        {% endif %}
+        {% if success %}
+            <p style="color: green;">{{ success }}</p>
+        {% endif %}
+        <form action="/players/register" method="post">
+            <div>
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+            <div>
+                <label for="phone">Phone Number:</label>
+                <input type="text" id="phone" name="phone" required>
+            </div>
+            <div>
+                <label for="age">Age:</label>
+                <input type="number" id="age" name="age" required>
+            </div>
+            <div>
+                <label for="role">Playing Style:</label>
+                <select id="role" name="role" required>
+                    <option value="batsman">Batsman</option>
+                    <option value="bowler">Bowler</option>
+                    <option value="allrounder">All-Rounder</option>
+                    <option value="wicketkeeper">Wicket Keeper</option>
+                </select>
+            </div>
+            <div>
+                <label for="batting_style">Batting Style:</label>
+                <select id="batting_style" name="batting_style" required>
+                    <option value="right">Right Handed</option>
+                    <option value="left">Left Handed</option>
+                </select>
+            </div>
+            <div>
+                <label for="fee_paid">Registration Fee Paid:</label>
+                <input type="checkbox" id="fee_paid" name="fee_paid" value="true">
+            </div>
+            <button type="submit">Register</button>
+        </form>
+    </main>
+</body>
+</html>

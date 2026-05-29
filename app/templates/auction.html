@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Auction - Cricket Tournament</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+    <style>
+        .auction-container { display: flex; gap: 20px; }
+        .panel { border: 1px solid #ccc; padding: 15px; flex: 1; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Live Auction Room</h1>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/players/register">Register Player</a>
+            <a href="/teams/register">Register Team</a>
+            <a href="/auction">Live Auction</a>
+        </nav>
+    </header>
+    <main>
+        <div>
+            <label for="client_role">Join as:</label>
+            <select id="client_role">
+                <option value="viewer">Viewer</option>
+                <option value="admin">Admin</option>
+                {% for team in teams %}
+                <option value="{{ team.id }}">Team: {{ team.name }} (Budget: {{ team.budget }})</option>
+                {% endfor %}
+            </select>
+            <button onclick="connectWebSocket()">Connect</button>
+        </div>
+        <hr>
+        <div class="auction-container" id="auction_board" style="display: none;">
+            <div class="panel" id="admin_panel" style="display: none;">
+                <h3>Admin Panel</h3>
+                <label for="player_select">Select Player:</label>
+                <select id="player_select">
+                    {% for player in unsold_players %}
+                    <option value="{{ player.id }}">{{ player.name }} (Base: {{ player.base_price }})</option>
+                    {% endfor %}
+                </select>
+                <button onclick="startBidding()">Present Player</button>
+                <button onclick="markSold()">Mark Sold</button>
+            </div>
+            <div class="panel">
+                <h3>Current Player</h3>
+                <div id="current_player_info">Waiting for admin to present a player...</div>
+                <h4 id="current_bid_info">Current Bid: 0</h4>
+                <div id="bid_panel" style="display: none;">
+                    <input type="number" id="bid_amount" placeholder="Enter bid amount">
+                    <button onclick="placeBid()">Place Bid</button>
+                </div>
+            </div>
+            <div class="panel">
+                <h3>Auction Log</h3>
+                <ul id="auction_log"></ul>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let ws;
+        let clientId;
+
+        function connectWebSocket() {
+            const roleSelect = document.getElementById("client_role");
+            clientId = roleSelect.value;
+
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            ws = new WebSocket(`${protocol}//${window.location.host}/auction/ws/${clientId}`);
+
+            ws.onopen = function() {
+                document.getElementById("auction_board").style.display = "flex";
+                if (clientId === "admin") {
+                    document.getElementById("admin_panel").style.display = "block";
+                } else if (clientId !== "viewer") {
+                    document.getElementById("bid_panel").style.display = "block";
+                }
+                logEvent("Connected to Live Auction.");
+            };
+
+            ws.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+
+                if (message.action === "new_player" || message.action === "current_state") {
+                    document.getElementById("current_player_info").innerHTML = `
+                        <strong>Name:</strong> ${message.player.name} <br>
+                        <strong>Role:</strong> ${message.player.role} <br>
+                        <strong>Base Price:</strong> ${message.player.base_price}
+                    `;
+                    document.getElementById("current_bid_info").innerText = `Current Bid: ${message.current_bid}`;
+                    if (message.action === "new_player") {
+                        logEvent(`Bidding started for ${message.player.name}`);
+                    }
+                } else if (message.action === "bid_update") {
+                    document.getElementById("current_bid_info").innerText = `Current Bid: ${message.current_bid} (by ${message.highest_bidder_name})`;
+                } else if (message.action === "player_sold") {
+                    logEvent(`${message.player_name} sold to ${message.team_name} for ${message.amount}`);
+                    document.getElementById("current_player_info").innerHTML = "Waiting for admin to present next player...";
+                    document.getElementById("current_bid_info").innerText = "Current Bid: 0";
+
+                    // Refresh page after a short delay to update budget/player lists
+                    setTimeout(() => window.location.reload(), 2000);
+                } else if (message.action === "error") {
+                    alert(message.message);
+                }
+            };
+        }
+
+        function startBidding() {
+            const playerId = document.getElementById("player_select").value;
+            ws.send(JSON.stringify({action: "start_bidding", player_id: playerId}));
+        }
+
+        function placeBid() {
+            const bidAmount = document.getElementById("bid_amount").value;
+            if (bidAmount) {
+                ws.send(JSON.stringify({action: "place_bid", team_id: clientId, bid_amount: bidAmount}));
+            }
+        }
+
+        function markSold() {
+            ws.send(JSON.stringify({action: "sold"}));
+        }
+
+        function logEvent(msg) {
+            const log = document.getElementById("auction_log");
+            const li = document.createElement("li");
+            li.innerText = msg;
+            log.prepend(li);
+        }
+    </script>
+</body>
+</html>

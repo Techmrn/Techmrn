@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboards - Cricket Tournament</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+    <style>
+        .boards { display: flex; gap: 20px; }
+        .board { flex: 1; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Player Leaderboards</h1>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/stats/points">Points Table</a>
+            <a href="/fixtures">Fixtures</a>
+        </nav>
+    </header>
+    <main class="boards">
+        <div class="board">
+            <h2>Top Run Scorers (Orange Cap)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Player</th>
+                        <th>Runs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in top_batsmen %}
+                    <tr>
+                        <td>{{ p.name }}</td>
+                        <td>{{ p.total_runs }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="board">
+            <h2>Highest Wicket Takers (Purple Cap)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Player</th>
+                        <th>Wickets</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in top_bowlers %}
+                    <tr>
+                        <td>{{ p.name }}</td>
+                        <td>{{ p.total_wickets }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>
